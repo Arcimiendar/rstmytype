@@ -1,8 +1,7 @@
-
 #[derive(PartialEq)]
 pub enum ApiEndpointMethod {
     Get,
-    Post
+    Post,
 }
 
 pub trait ApiEndpoint {

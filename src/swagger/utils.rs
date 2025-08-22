@@ -9,21 +9,18 @@ enum ObjectOrArrayBuilder {
 fn parse_type(field: &serde_yaml_ng::Value) -> ObjectOrArrayBuilder {
     let mut object = ObjectBuilder::new();
 
-    let description = field
+    let description_opt = field
         .get("description")
         .and_then(|d_v| d_v.as_str())
-        .or(Some(""))
-        .unwrap()
-        .to_string();
+        .or(Some(""));
 
     let field_type = field
         .get("type")
         .and_then(|t| t.as_str())
-        .or(Some("string"))
-        .unwrap();
+        .or(Some("string"));
 
     object = match field_type {
-        "string" | "timestamp" => {
+        Some("string" | "timestamp") => {
             object = object.schema_type(Type::String);
 
             let enum_v_opt = field
@@ -33,9 +30,8 @@ fn parse_type(field: &serde_yaml_ng::Value) -> ObjectOrArrayBuilder {
                     Some(
                         e.iter()
                             .map(|v| v.as_str())
-                            .filter(|v| v.is_some())
-                            .map(|v| v.unwrap().to_string())
-                            .collect::<Vec<String>>(),
+                            .flat_map(|v| v)
+                            .collect::<Vec<&str>>(),
                     )
                 });
 
@@ -45,9 +41,9 @@ fn parse_type(field: &serde_yaml_ng::Value) -> ObjectOrArrayBuilder {
 
             object
         }
-        "number" | "integer" => object.schema_type(Type::Number),
-        "boolean" | "bool" => object.schema_type(Type::Boolean),
-        "object" => {
+        Some("number" | "integer") => object.schema_type(Type::Number),
+        Some("boolean" | "bool") => object.schema_type(Type::Boolean),
+        Some("object") => {
             let inner_fields_opt = field.get("fields").and_then(|f| f.as_sequence());
 
             if let Some(inner_fields) = inner_fields_opt {
@@ -56,24 +52,27 @@ fn parse_type(field: &serde_yaml_ng::Value) -> ObjectOrArrayBuilder {
                     if name_opt.is_none() {
                         continue;
                     }
-                    let name = name_opt.unwrap();
-                    let optional_flag = inner_field
+                    let Some(name) = name_opt else {
+                        continue;
+                    };
+                    let optional_flag_opt = inner_field
                         .get("optional")
                         .and_then(|o| o.as_bool())
-                        .or(Some(false))
-                        .unwrap();
+                        .or(Some(false));
 
                     let inner_type = parse_type(inner_field);
                     match inner_type {
                         ObjectOrArrayBuilder::Object(o) => {
-                            object = object.property(name.to_string(), o);
+                            object = object.property(name, o);
                         }
                         ObjectOrArrayBuilder::Array(a) => {
-                            object = object.property(name.to_string(), a);
+                            object = object.property(name, a);
                         }
                     }
 
-                    if !optional_flag {
+                    if let Some(optional_flag) = optional_flag_opt
+                        && optional_flag
+                    {
                         object = object.required(name);
                     }
                 }
@@ -81,7 +80,7 @@ fn parse_type(field: &serde_yaml_ng::Value) -> ObjectOrArrayBuilder {
 
             object
         }
-        "array" => {
+        Some("array") => {
             let arr = object.to_array_builder();
             let items_opt = field.get("items");
 
@@ -100,27 +99,21 @@ fn parse_type(field: &serde_yaml_ng::Value) -> ObjectOrArrayBuilder {
         _ => object,
     };
 
-    ObjectOrArrayBuilder::Object(object.description(Some(description)))
+    ObjectOrArrayBuilder::Object(object.description(description_opt))
 }
 
 pub fn append_field(field: &serde_yaml_ng::Value, object: ObjectBuilder) -> ObjectBuilder {
-    let field_map_opt = field.as_mapping();
-    if field_map_opt.is_none() {
-        return object;
-    }
-    let field_map = field_map_opt.unwrap();
+    let name_opt = field.get("field").and_then(|n| n.as_str());
 
-    let name_opt = field_map.get("field").and_then(|n| n.as_str());
-    if name_opt.is_none() {
+    let Some(name) = name_opt else {
         return object;
-    }
-    let name = name_opt.unwrap().to_string();
+    };
 
     let field_type = parse_type(&field);
 
     match field_type {
-        ObjectOrArrayBuilder::Array(a) => object.property(name.to_string(), a),
-        ObjectOrArrayBuilder::Object(o) => object.property(name.to_string(), o),
+        ObjectOrArrayBuilder::Array(a) => object.property(name, a),
+        ObjectOrArrayBuilder::Object(o) => object.property(name, o),
     }
     .required(name)
 }

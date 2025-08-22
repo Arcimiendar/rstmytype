@@ -10,53 +10,45 @@ use utoipa::openapi::{
 
 use crate::swagger::params::{get_query_params, get_request_body};
 use crate::swagger::response::get_response;
-use crate::swagger::types::{ApiProject, ApiEndpoint, ApiEndpointMethod};
+use crate::swagger::types::{ApiEndpoint, ApiEndpointMethod, ApiProject};
 
-pub mod types;
 mod params;
 mod response;
+pub mod types;
 mod utils;
 
-fn get_operation_and_schema(
-    endpoint: &impl ApiEndpoint,
-) -> (Operation, HashMap<String, Schema>) {
+fn get_operation_and_schema(endpoint: &impl ApiEndpoint) -> (Operation, HashMap<String, Schema>) {
     let mut operation = OperationBuilder::new()
         .operation_id(Some(endpoint.get_url_path()))
         .tag(endpoint.get_endpoint_tag());
     let mut schema_openapi_map = HashMap::new();
 
-    let schema_str_opt = endpoint.get_yml_declaration_str();
-    if schema_str_opt.is_none() {
+    let Some(schema_str) = endpoint.get_yml_declaration_str() else {
         return (operation.build(), schema_openapi_map);
-    }
-
-    let schema_str = schema_str_opt.unwrap();
-    // warn!("{}", schema_str);
+    };
 
     let schema_res = serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&schema_str);
 
-    if schema_res.is_err() {
+    let Ok(schema) = schema_res else {
         warn!(
             "Found declaration in {}, but it's maleformatted",
             endpoint.get_url_path()
         );
         return (operation.build(), schema_openapi_map);
-    }
-    let schema = schema_res.unwrap();
+    };
 
     let declaration_opt = schema
         .as_mapping()
         .and_then(|s| s.get("declaration"))
         .and_then(|d| d.as_mapping());
 
-    if declaration_opt.is_none() {
+    let Some(declaration) = declaration_opt else {
         warn!(
             "Found declaration in {}, but it's maleformatted",
             endpoint.get_url_path()
         );
         return (operation.build(), schema_openapi_map);
-    }
-    let declaration = declaration_opt.unwrap();
+    };
 
     if let Some(description_val) = declaration.get("description") {
         if !description_val.is_string() {
@@ -66,15 +58,22 @@ fn get_operation_and_schema(
             );
         }
 
-        let description = description_val.as_str().unwrap();
-        operation = operation.description(Some(description.to_string()));
+        let description = description_val.as_str();
+        if description.is_none() {
+            warn!(
+                "Found declaration in {}, declaration.description must be a string",
+                endpoint.get_url_path()
+            );
+        };
+        operation = operation.description(description);
     }
 
     if let Some((response, schema)) = get_response(&declaration) {
         operation = operation.response("200", response);
 
         schema_openapi_map.insert(
-            format!("Response{}", endpoint.get_url_path().replace("/", "_")).to_case(Case::UpperCamel),
+            format!("Response{}", endpoint.get_url_path().replace("/", "_"))
+                .to_case(Case::UpperCamel),
             schema,
         );
     }
@@ -90,7 +89,8 @@ fn get_operation_and_schema(
             operation = operation.request_body(Some(request_body));
 
             schema_openapi_map.insert(
-                format!("Post{}", endpoint.get_url_path().replace("/", "_")).to_case(Case::UpperCamel),
+                format!("Post{}", endpoint.get_url_path().replace("/", "_"))
+                    .to_case(Case::UpperCamel),
                 schema,
             );
         }
@@ -141,7 +141,7 @@ pub fn build_open_api(api_project: &impl ApiProject) -> OpenApi {
 
     for endpoint in api_project.get_endpoints_iter() {
         (paths_builder, components_builder) =
-                build_schema_for_endpoint(paths_builder, components_builder, endpoint);
+            build_schema_for_endpoint(paths_builder, components_builder, endpoint);
     }
 
     builder

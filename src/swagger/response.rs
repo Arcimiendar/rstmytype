@@ -6,14 +6,10 @@ use utoipa::openapi::{
 use crate::swagger::utils::append_field;
 
 pub fn get_response(schema_map: &serde_yaml_ng::Mapping) -> Option<(Response, Schema)> {
-    let field_arr_opt = schema_map
+    let field_arr = schema_map
         .get("response")
         .and_then(|r| r.get("fields"))
-        .and_then(|fs| fs.as_sequence());
-    if field_arr_opt.is_none() {
-        return None;
-    }
-    let field_arr = field_arr_opt.unwrap();
+        .and_then(|fs| fs.as_sequence())?;
     if field_arr.is_empty() {
         return None;
     }

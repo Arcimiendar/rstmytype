@@ -9,31 +9,18 @@ use utoipa::openapi::{
 use crate::swagger::utils::append_field;
 
 pub fn get_query_params(declaration: &serde_yaml_ng::Mapping) -> Option<Vec<Parameter>> {
-    let query_arr_opt = declaration
+    let query_arr = declaration
         .get("allowlist")
         .and_then(|a| a.get("query"))
-        .and_then(|q| q.as_sequence());
-
-    if query_arr_opt.is_none() {
-        return None;
-    }
+        .and_then(|q| q.as_sequence())?;
 
     Some(
-        query_arr_opt
-            .unwrap()
+        query_arr
             .iter()
             .map(|qp| {
-                let name_opt = qp.get("field").and_then(|f| f.as_str());
-                if name_opt.is_none() {
-                    return None;
-                }
-                let name = name_opt.unwrap();
+                let name = qp.get("field").and_then(|f| f.as_str())?;
 
-                let description = qp
-                    .get("description")
-                    .and_then(|d| d.as_str())
-                    .or(Some(""))
-                    .unwrap();
+                let description = qp.get("description").and_then(|d| d.as_str());
 
                 // change it if query params will be parsed from server side, not DB side
                 let qp_type = Type::String;
@@ -41,7 +28,7 @@ pub fn get_query_params(declaration: &serde_yaml_ng::Mapping) -> Option<Vec<Para
                 let param = ParameterBuilder::new()
                     .name(name.to_string())
                     .parameter_in(ParameterIn::Query)
-                    .description(Some(description))
+                    .description(description)
                     .required(Required::True)
                     .schema(Some(Schema::Object(
                         ObjectBuilder::new().schema_type(qp_type).build(),
@@ -49,21 +36,16 @@ pub fn get_query_params(declaration: &serde_yaml_ng::Mapping) -> Option<Vec<Para
                     .build();
                 Some(param)
             })
-            .filter(|qp| qp.is_some())
-            .map(|qp| qp.unwrap())
+            .flat_map(|v| v)
             .collect(),
     )
 }
 
 pub fn get_request_body(declaration: &serde_yaml_ng::Mapping) -> Option<(RequestBody, Schema)> {
-    let field_arr_opt = declaration
+    let field_arr = declaration
         .get("allowlist")
         .and_then(|a| a.get("body"))
-        .and_then(|b| b.as_sequence());
-    if field_arr_opt.is_none() {
-        return None;
-    }
-    let field_arr = field_arr_opt.unwrap();
+        .and_then(|b| b.as_sequence())?;
 
     let mut object = ObjectBuilder::new();
 
