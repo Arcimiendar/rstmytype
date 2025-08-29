@@ -9,11 +9,11 @@ use utoipa::openapi::{
 use crate::swagger::utils::append_field;
 
 pub fn get_query_params(declaration: &serde_yaml_ng::Mapping) -> Option<Vec<Parameter>> {
-    let query_arr = declaration
-        .get("allowlist")
-        .and_then(|a| a.get("query"))
+    let allow_list = declaration.get("allowlist")?;
+    let query_arr = allow_list
+        .get("query")
+        .or_else(|| allow_list.get("params"))
         .and_then(|q| q.as_sequence())?;
-
     Some(
         query_arr
             .iter()

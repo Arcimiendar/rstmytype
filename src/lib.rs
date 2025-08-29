@@ -109,6 +109,32 @@ mod tests {
         )]);
 
         build_open_api(&api_project);
+
+        let api_project = ApiProjectTest::new(vec![ApiEndpointTest::new(
+            ApiEndpointMethod::Get,
+            "/1/2/3".to_owned(),
+            Some(
+                r#"
+                    declaration:
+                      description: test get params
+                      allowlist:
+                        params:
+                          - field: hello
+                            type: integer
+                          - field: hello2
+                            type: integer
+                            description: hello 2
+                      response:
+                        fields:
+                          - field: ?column?
+                            description: test unnamed column
+                            type: integer
+                "#
+                .to_owned(),
+            ),
+        )]);
+
+        build_open_api(&api_project);
     }
 
     #[test]
