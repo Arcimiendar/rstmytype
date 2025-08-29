@@ -67,7 +67,7 @@ mod tests {
     }
 
     #[test]
-    fn smocking_test() {
+    fn smoking_test() {
         let api_project = ApiProjectTest::new(vec![]);
         build_open_api(&api_project);
     }
@@ -95,6 +95,9 @@ mod tests {
                         query:
                           - field: hello
                             type: integer
+                          - field: hello2
+                            type: integer
+                            description: hello 2
                       response:
                         fields:
                           - field: ?column?
@@ -118,8 +121,15 @@ mod tests {
                   declaration:
                     description: test post params
                     allowlist:
+                      headers:
+                        - field: one
+                          type: string
+                          description: test header
+                        - field: two
+                          type: string
                       body:
                         - field: one
+                          description: one
                           type: integer
                         - field: two
                           type: object
@@ -131,6 +141,7 @@ mod tests {
                       fields:
                         - field: one
                           type: integer
+                          description: field
                         - field: two
                           type: object
                         - field: three

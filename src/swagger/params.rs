@@ -17,8 +17,8 @@ pub fn get_query_params(declaration: &serde_yaml_ng::Mapping) -> Option<Vec<Para
     Some(
         query_arr
             .iter()
-            .map(|qp| {
-                let name = qp.get("field").and_then(|f| f.as_str())?;
+            .flat_map(|qp| {
+                let name = qp.get("field")?.as_str()?;
 
                 let description = qp.get("description").and_then(|d| d.as_str());
 
@@ -36,7 +36,6 @@ pub fn get_query_params(declaration: &serde_yaml_ng::Mapping) -> Option<Vec<Para
                     .build();
                 Some(param)
             })
-            .flat_map(|v| v)
             .collect(),
     )
 }
@@ -61,4 +60,36 @@ pub fn get_request_body(declaration: &serde_yaml_ng::Mapping) -> Option<(Request
         .build();
 
     Some((request_body, schema))
+}
+
+pub fn get_headers(declaration: &serde_yaml_ng::Mapping) -> Option<Vec<Parameter>> {
+    let headers_arr = declaration
+        .get("allowlist")
+        .and_then(|a| a.get("headers"))
+        .and_then(|h| h.as_sequence())?;
+
+    Some(
+        headers_arr
+            .iter()
+            .flat_map(|h| {
+                let name = h.get("field")?.as_str()?;
+
+                let description = h.get("description").and_then(|d| d.as_str());
+
+                // change it if header params will be casted to the type other that string
+                let h_type = Type::String;
+
+                let param = ParameterBuilder::new()
+                    .name(name.to_string())
+                    .parameter_in(ParameterIn::Header)
+                    .description(description)
+                    .required(Required::True)
+                    .schema(Some(Schema::Object(
+                        ObjectBuilder::new().schema_type(h_type).build(),
+                    )))
+                    .build();
+                Some(param)
+            })
+            .collect(),
+    )
 }

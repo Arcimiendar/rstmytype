@@ -8,7 +8,7 @@ use utoipa::openapi::{
     path::{Operation, OperationBuilder, PathItemBuilder},
 };
 
-use crate::swagger::params::{get_query_params, get_request_body};
+use crate::swagger::params::{get_headers, get_query_params, get_request_body};
 use crate::swagger::response::get_response;
 use crate::swagger::types::{ApiEndpoint, ApiEndpointMethod, ApiProject};
 
@@ -93,6 +93,12 @@ fn get_operation_and_schema(endpoint: &impl ApiEndpoint) -> (Operation, HashMap<
                     .to_case(Case::UpperCamel),
                 schema,
             );
+        }
+    }
+
+    if let Some(headers) = get_headers(&declaration) {
+        for param in headers {
+            operation = operation.parameter(param);
         }
     }
 
